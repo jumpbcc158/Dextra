@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Canva Switcher (Lite)</title>
+  <title>Canva Switcher (Lite v2)</title>
   <style>
     html, body, iframe { height:100%; width:100%; margin:0; border:0; padding:0; background:#fff; }
   </style>
@@ -33,18 +33,29 @@
       }
 
       function resolvePage() {
-        // Priority: local ?page -> parent ?cv -> parent hash -> default 1
+        // Priority: local ?page -> parent ?cv -> parent hash -> top ?cv -> top hash -> default 1
         const local = getParamFrom(window.location.href, 'page');
         if (local) return local;
 
         try {
-          // Same-origin only; will fail silently otherwise
-          const purl = window.top.location.href;
-          const fromCv = getParamFrom(purl, 'cv');
-          if (fromCv) return fromCv;
-          const fromHash = getHashNumber(window.top.location.hash);
-          if (fromHash) return fromHash;
-        } catch (e) { /* cross-origin or sandbox */ }
+          const purl = window.parent && window.parent.location ? window.parent.location.href : null;
+          if (purl) {
+            const fromCv = getParamFrom(purl, 'cv');
+            if (fromCv) return fromCv;
+            const fromHash = getHashNumber(window.parent.location.hash);
+            if (fromHash) return fromHash;
+          }
+        } catch (e) { /* cross-origin parent */ }
+
+        try {
+          const turl = window.top && window.top.location ? window.top.location.href : null;
+          if (turl) {
+            const fromCvTop = getParamFrom(turl, 'cv');
+            if (fromCvTop) return fromCvTop;
+            const fromHashTop = getHashNumber(window.top.location.hash);
+            if (fromHashTop) return fromHashTop;
+          }
+        } catch (e) { /* cross-origin top */ }
 
         return 1;
       }
@@ -53,16 +64,14 @@
         iframe.src = base + '#' + clamp(n);
       }
 
-      // Initial set
       setPage(resolvePage());
 
-      // If parent hash changes (e.g., links like #7), try to update without page reload
       try {
-        window.top.addEventListener('hashchange', function() {
-          const h = getHashNumber(window.top.location.hash);
+        window.parent.addEventListener('hashchange', function() {
+          const h = getHashNumber(window.parent.location.hash);
           if (h) setPage(h);
         });
-      } catch (e) { /* ignored if cross-origin */ }
+      } catch (e) { /* ignore if cross-origin */ }
     })();
   </script>
 </body>
