@@ -3,157 +3,66 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Embeddable Map</title>
-  <!-- Leaflet CSS/JS via CDN -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <title>Canva Switcher (Lite)</title>
   <style>
-    html, body {
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      background: #f6f7f9;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-    }
-    #map {
-      height: 100%;
-      width: 100%;
-    }
-    .topbar {
-      position: absolute;
-      top: 8px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(255,255,255,0.9);
-      border-radius: 12px;
-      padding: 6px 12px;
-      box-shadow: 0 2px 12px rgba(0,0,0,.08);
-      z-index: 1000;
-      font-size: 14px;
-      line-height: 1.35;
-      display: none; /* shown when there is a title= param */
-    }
-    .leaflet-control.custom-btn {
-      background: #fff;
-      border: 1px solid #d0d7de;
-      border-radius: 8px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-      padding: 6px 8px;
-      cursor: pointer;
-      font-size: 13px;
-    }
-    .leaflet-control.custom-btn:active { transform: translateY(1px); }
+    html, body, iframe { height:100%; width:100%; margin:0; border:0; padding:0; background:#fff; }
   </style>
 </head>
 <body>
-  <div id="map"></div>
-  <div class="topbar" id="titleBar"></div>
+  <iframe id="cv" src="https://www.canva.com/design/DAGq31qQuv0/bWCRwDmebc_YtTsuj6VMiA/view?embed#1" allowfullscreen loading="lazy"></iframe>
 
   <script>
     (function() {
-      const params = new URLSearchParams(window.location.search);
+      const MAX = 14;
+      const base = "https://www.canva.com/design/DAGq31qQuv0/bWCRwDmebc_YtTsuj6VMiA/view?embed";
+      const iframe = document.getElementById('cv');
 
-      // Read basic params
-      const lat = parseFloat(params.get('lat'));
-      const lng = parseFloat(params.get('lng'));
-      const zoom = parseInt(params.get('zoom') || '2', 10);
-      const fitMarkers = (params.get('fitMarkers') || '').toLowerCase() === 'true';
-      const showLoc = (params.get('showLoc') || '').toLowerCase() === 'true';
-      const title = params.get('title');
-      
-      // Optional title bar
-      if (title) {
-        const titleBar = document.getElementById('titleBar');
-        titleBar.style.display = 'block';
-        titleBar.textContent = decodeURIComponent(title);
-      }
+      function clamp(n) { n = parseInt(n, 10); return (isNaN(n) ? 1 : Math.max(1, Math.min(MAX, n))); }
 
-      // Create map
-      const map = L.map('map', {
-        zoomControl: true,
-        worldCopyJump: true
-      });
-
-      // Tile layer (OpenStreetMap). For heavy use, consider your own tile service.
-      const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-      }).addTo(map);
-
-      // Center/zoom default
-      if (!isNaN(lat) && !isNaN(lng)) {
-        map.setView([lat, lng], isNaN(zoom) ? 6 : zoom);
-      } else {
-        // default world view
-        map.setView([20, 0], zoom);
-      }
-
-      // Parse markers param: "lat,lng,label;lat,lng,label"
-      const markersParam = params.get('markers');
-      const markerGroup = L.featureGroup();
-      if (markersParam) {
+      function getParamFrom(url, name) {
         try {
-          markersParam.split(';').forEach(m => {
-            if (!m.trim()) return;
-            const parts = m.split(',');
-            if (parts.length >= 2) {
-              const mlat = parseFloat(parts[0]);
-              const mlng = parseFloat(parts[1]);
-              const label = parts.slice(2).join(','); // support commas in label by joining rest
-              if (!isNaN(mlat) && !isNaN(mlng)) {
-                const mk = L.marker([mlat, mlng]);
-                if (label && label.trim()) {
-                  mk.bindPopup(decodeURIComponent(label.trim()));
-                }
-                markerGroup.addLayer(mk);
-              }
-            }
-          });
-          if (markerGroup.getLayers().length > 0) {
-            markerGroup.addTo(map);
-            if (fitMarkers) {
-              map.fitBounds(markerGroup.getBounds().pad(0.15));
-            }
-          }
-        } catch (e) {
-          console.warn('Failed to parse markers param:', e);
-        }
+          const q = new URL(url).searchParams.get(name);
+          return q ? clamp(q) : null;
+        } catch (e) { return null; }
       }
 
-      // Scale control
-      L.control.scale({imperial: false}).addTo(map);
+      function getHashNumber(hash) {
+        if (!hash) return null;
+        const m = hash.match(/#(\d+)/);
+        return m ? clamp(m[1]) : null;
+      }
 
-      // Optional: Locate Me button
-      if (showLoc && 'geolocation' in navigator) {
-        const LocateControl = L.Control.extend({
-          options: { position: 'topleft' },
-          onAdd: function () {
-            const btn = L.DomUtil.create('div', 'leaflet-control custom-btn');
-            btn.innerHTML = '📍 My location';
-            btn.title = 'Center map on your current location';
-            btn.onclick = function () {
-              navigator.geolocation.getCurrentPosition(function(pos) {
-                const coords = [pos.coords.latitude, pos.coords.longitude];
-                const you = L.circleMarker(coords, { radius: 8 });
-                you.bindPopup('You are here');
-                you.addTo(map);
-                map.setView(coords, 13);
-              }, function(err) {
-                alert('Unable to get your location: ' + err.message);
-              }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 });
-            };
-            return btn;
-          }
+      function resolvePage() {
+        // Priority: local ?page -> parent ?cv -> parent hash -> default 1
+        const local = getParamFrom(window.location.href, 'page');
+        if (local) return local;
+
+        try {
+          // Same-origin only; will fail silently otherwise
+          const purl = window.top.location.href;
+          const fromCv = getParamFrom(purl, 'cv');
+          if (fromCv) return fromCv;
+          const fromHash = getHashNumber(window.top.location.hash);
+          if (fromHash) return fromHash;
+        } catch (e) { /* cross-origin or sandbox */ }
+
+        return 1;
+      }
+
+      function setPage(n) {
+        iframe.src = base + '#' + clamp(n);
+      }
+
+      // Initial set
+      setPage(resolvePage());
+
+      // If parent hash changes (e.g., links like #7), try to update without page reload
+      try {
+        window.top.addEventListener('hashchange', function() {
+          const h = getHashNumber(window.top.location.hash);
+          if (h) setPage(h);
         });
-        map.addControl(new LocateControl());
-      }
-
-      // Resize fix for SharePoint iframe refreshes
-      window.addEventListener('resize', () => {
-        map.invalidateSize();
-      });
+      } catch (e) { /* ignored if cross-origin */ }
     })();
   </script>
 </body>
